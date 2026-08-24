@@ -2,17 +2,12 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.38%2B-FF4B4B)
+![SQLite](https://img.shields.io/badge/Database-SQLite-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**DriveBD** is a comprehensive web application designed to simulate the national driver and vehicle management system of Bangladesh. Built with **Python** and **Streamlit**, it provides a centralized platform for vehicle owners, drivers, and administrators to manage registrations, traffic violations, digital documents, vehicle maintenance, and fine payments.
+**DriveBD** is a comprehensive web application designed to simulate the national driver and vehicle management system of Bangladesh. Built with **Python**, **Streamlit**, and **SQLAlchemy**, it provides a centralized platform for vehicle owners, drivers, and administrators to manage registrations, traffic violations, digital documents, vehicle maintenance, and fine payments.
 
 > ⚠️ **Disclaimer:** This is an academic/portfolio capstone project. It is **not affiliated with, endorsed by, or connected to BRTA** (Bangladesh Road Transport Authority), Bangladesh Police, or any government organization. All data, users, and records are synthetically generated for demonstration purposes only.
-
-> 🇧🇩 **Update — Bangladesh-friendly + workable actions added:** Registration now validates a real Bangladeshi mobile number format (`01XXXXXXXXX`) and NID length (10/13/17 digits). The Violations page now has actual **Pay Fine** (bKash/Nagad/Card/Cash) and **File Appeal** actions instead of just a read-only table, "Appeals" was added to the sidebar (it existed as a page but had no nav link), and the Admin → Appeals tab now has real **Approve/Reject** buttons that waive the fine or send it back to pending, so the appeal workflow described in the docs actually works end-to-end.
-
-> 🛠️ **Note on this fixed version:** This copy of the repo runs entirely from the single `app.py` file, which contains its own in-memory mock database and login system. The original `pages/` and `utils/` folders implemented a **second, separate** login system (bcrypt + SQLite) that Streamlit auto-added to the sidebar navigation — clicking those auto-generated links used different session state than `app.py`'s login, which is what caused "please log in" errors for already-logged-in users, including admin. Those folders have been renamed to `legacy_unused_pages/` and `legacy_unused_utils/` so Streamlit no longer picks them up. They're kept only for reference and are not used by the running app. `app.py`'s mock database is now also wrapped in `st.cache_resource`, so it's created once and kept in server memory — registrations, admin edits, etc. now persist across clicks/reruns for as long as the app process stays up, instead of being silently reset on every interaction.
-
-> 🧹 **Note on the latest pass:** The UI is now English-only (the earlier bilingual English/Bangla labels have been removed for consistency). Also fixed: the landing page's "Create free account" button (it targeted a Streamlit internal element that didn't exist, so it silently did nothing — it now scrolls to the login/register section), a duplicate "Dashboard/Vehicles" quick-nav row that redundantly sat under the header, the dashboard's unread-notification count (it was summing every user's notifications instead of the logged-in user's), missing seed notifications for the owner/admin demo accounts, violations pagination (it broke past page 4), and a few smaller polish items — see the CHANGELOG-equivalent commit history for the full list. `requirements.txt` and this README have also been trimmed to match what the running `app.py` actually uses.
 
 ---
 
@@ -41,8 +36,9 @@ The system is designed for educational, research, and portfolio purposes while f
 
 ## 🔐 Authentication & RBAC
 
-- Login/Registration (mock, in-memory accounts)
-- Session Management (`st.session_state`)
+- Secure Login
+- Bcrypt Password Hashing
+- Session Management
 - Three Roles:
   - Admin
   - Vehicle Owner
@@ -97,7 +93,8 @@ Supported mock payment methods
 Features
 
 - Instant Payment
-- Payment History with Receipt Numbers
+- Payment History
+- Downloadable PDF Receipt
 - Status Tracking
 
 ---
@@ -163,13 +160,26 @@ Administrator capabilities include
 
 ## 📈 Data Analytics
 
-The Admin panel includes summary tables and totals (revenue, violation counts, vehicle/user breakdowns). Interactive charting (e.g. Plotly) isn't wired into the running app yet — see Future Improvements.
+Interactive Plotly Charts
+
+- Violation Distribution
+- Monthly Revenue
+- Payment Trends
+- Violation Types
+- User Statistics
+- Outstanding Fine Analysis
 
 ---
 
 ## 📑 Report Generation
 
-Not currently implemented in the running app (no CSV/PDF export buttons) — listed here as a planned feature. See Future Improvements.
+Export
+
+- CSV Reports
+- PDF Reports
+- Payment Reports
+- Violation Reports
+- Vehicle Reports
 
 ---
 
@@ -214,27 +224,40 @@ Receive alerts for
 
 # 🛠️ Technology Stack
 
-This section describes what `app.py` (the version that actually runs) uses. The `legacy_unused_pages/` and `legacy_unused_utils/` folders reference a different, unused stack — see the note above.
-
-## Frontend & App Framework
+## Frontend
 
 - Streamlit
 
 ## Backend
 
 - Python
+- SQLAlchemy ORM
+
+## Database
+
+- SQLite
+- PostgreSQL (Production Ready)
 
 ## Data Processing
 
 - Pandas
+- NumPy
 
-## Data Storage
+## Visualization
 
-- In-memory only (a Python object cached with `st.cache_resource`). Nothing is written to disk, so all data resets when the app process restarts. The `data/*.csv` files in this repo are reference samples, not a live database.
+- Plotly
 
-## PDF / Export
+## PDF Generation
 
-- Not currently implemented in `app.py` (see Future Improvements below).
+- ReportLab
+
+## Authentication
+
+- Bcrypt
+
+## Mock Data
+
+- Faker
 
 ---
 
@@ -285,7 +308,24 @@ pip install -r requirements.txt
 
 ---
 
-## 4️⃣ Run Application
+## 4️⃣ Initialize Database
+
+```bash
+python -m utils.seed
+```
+
+This generates
+
+- drivebd.db
+- Sample Users
+- Sample Vehicles
+- Violations
+- Payments
+- CSV Files
+
+---
+
+## 5️⃣ Run Application
 
 ```bash
 streamlit run app.py
@@ -297,23 +337,28 @@ Open
 http://localhost:8501
 ```
 
-The app seeds its own demo data (users, vehicles, violations, payments, etc.) in memory on startup — no separate database initialization step is needed.
-
 ---
 
 # 🔐 Demo Credentials
 
-These accounts are created automatically in memory the first time the app starts — no setup step is required.
+After running the seed script
 
 | Role | Email | Password |
 |------|--------|----------|
 | Admin | admin@drivebd.gov.bd | Admin@123 |
-| Driver | driver@drivebd.gov.bd | Demo@123 |
-| Owner | owner@drivebd.gov.bd | Demo@123 |
+| Owner | demo@drivebd.gov.bd | Demo@123 |
 
-(These match the accounts actually seeded in `app.py`'s `DriveDB._seed_data()`. The table previously listed `demo@drivebd.gov.bd`, which doesn't exist — that mismatch was itself a source of "login failures".)
+Additional randomly generated users can be found inside
 
-Additional randomly generated demo users (`user4@mail.com` … `user14@mail.com`, all password `Demo@123`) are created automatically on first run — a few are randomly marked "suspended" to demonstrate that status check.
+```
+data/users.csv
+```
+
+Default password
+
+```
+Password@123
+```
 
 ---
 
@@ -343,7 +388,16 @@ Select your repository.
 
 ## Step 4
 
-No extra setup is needed for storage — `app.py`'s mock database lives entirely in memory (wrapped in `st.cache_resource`) and seeds itself automatically on first load. Just be aware that on Streamlit Community Cloud, that memory is cleared whenever the app sleeps/restarts, so registrations and other changes won't survive a redeploy or a long idle period. For data that needs to persist, see the Production Tip below.
+Because Streamlit Cloud uses temporary storage, add this after `init_db()` inside `app.py`.
+
+```python
+import os
+from utils.db import DB_PATH
+
+if not os.path.exists(DB_PATH):
+    from utils.seed import generate
+    generate()
+```
 
 ---
 
@@ -361,7 +415,17 @@ app.py
 
 ### 💡 Production Tip
 
-The current `app.py` has no persistence layer at all — everything lives in server memory and resets on restart. If you want data to survive restarts, the most realistic path is to add a real datastore (e.g. SQLite, or a hosted Postgres provider like Neon, Supabase, or Railway) and swap the in-memory `DriveDB` class for one that reads/writes to it. That's a genuine code change, not a config toggle.
+For persistent data storage, configure a PostgreSQL database and set the following environment variable in **Streamlit → Settings → Secrets**:
+
+```text
+DATABASE_URL=postgresql://username:password@host:5432/database
+```
+
+Recommended free providers:
+
+- Neon
+- Supabase
+- Railway PostgreSQL
 
 ---
 
@@ -370,29 +434,18 @@ The current `app.py` has no persistence layer at all — everything lives in ser
 ```text
 drivebd/
 │
-├── app.py                    # The actual running app — everything else below is legacy/unused
+├── app.py
 ├── requirements.txt
 ├── README.md
 │
-├── .streamlit/
-│   └── config.toml
+├── utils/
+│   ├── auth.py
+│   ├── db.py
+│   ├── seed.py
+│   ├── pdf_utils.py
+│   └── helpers.py
 │
-├── .devcontainer/
-│   └── devcontainer.json
-│
-├── data/                     # Reference CSV samples, not a live database
-│   ├── users.csv
-│   ├── vehicles.csv
-│   ├── violations.csv
-│   ├── payments.csv
-│   ├── documents.csv
-│   ├── service_history.csv
-│   ├── appeals.csv
-│   ├── notifications.csv
-│   ├── activity_logs.csv
-│   └── settings.csv
-│
-├── legacy_unused_pages/      # Old Streamlit multipage app, not loaded by app.py
+├── pages/
 │   ├── 1_Dashboard.py
 │   ├── 2_Vehicles.py
 │   ├── 3_Violations.py
@@ -407,11 +460,11 @@ drivebd/
 │   ├── 12_Mock_BRTA_API.py
 │   └── 13_AI_Demo.py
 │
-└── legacy_unused_utils/      # Old SQLAlchemy/bcrypt backend, not used by app.py
-    ├── auth.py
-    ├── db.py
-    ├── pdf_utils.py
-    └── seed.py
+├── assets/
+│
+├── data/
+│
+└── drivebd.db
 ```
 
 ---
@@ -443,27 +496,20 @@ Example:
 
 ---
 
-# 🔒 Security Notes
+# 🔒 Security Features
 
-This is a demo/portfolio app, not a hardened production system. Specifically:
-
-- Passwords are stored and compared in **plaintext** in the in-memory mock database — fine for a demo with fake accounts, but not something to copy into a real app.
-- There's no real backend or database, so there's nothing to SQL-inject and no ORM layer to speak of.
-- Access to admin-only pages is gated by a role check in `app.py` (`user['role'] == 'admin'`), not by any server-side enforcement — it's a UI-level guard suitable for a demo, not a security boundary.
-- Session state is Streamlit's built-in `st.session_state`, scoped to the browser session; there's no token-based auth, expiry, or CSRF protection.
-- Basic input validation exists for things like phone number and NID format on registration.
-
-If you build on this for something real, add proper password hashing, a real datastore, and server-side authorization checks before deploying it anywhere with real user data.
+- Bcrypt Password Hashing
+- Role-Based Access Control (RBAC)
+- SQLAlchemy ORM Protection
+- Session Authentication
+- Input Validation
+- Protected Admin Pages
+- Safe Database Transactions
 
 ---
 
 # 🧪 Future Improvements
 
-- Interactive Charts/Analytics (e.g. Plotly)
-- CSV/PDF Report Export
-- Downloadable PDF Payment Receipts
-- Persistent Storage (SQLite/Postgres instead of in-memory)
-- Real Password Hashing
 - OCR-based License Verification
 - Real AI Computer Vision
 - Live Camera Integration
@@ -489,7 +535,11 @@ This project is licensed under the **MIT License**.
 
 - Real-world Bangladesh transportation concepts inspired by public BRTA guidelines and transport policies.
 - Streamlit for the interactive web framework.
-- Pandas for data handling and display.
+- SQLAlchemy for robust ORM support.
+- Plotly for interactive visualizations.
+- Pandas and NumPy for efficient data processing.
+- Faker for generating realistic synthetic datasets.
+- ReportLab for professional PDF generation.
 - The Python open-source community for excellent libraries and tooling.
 
 ---
