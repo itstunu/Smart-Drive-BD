@@ -123,9 +123,6 @@ class DriveDB:
         
         for i in range(22):
             veh = self._rand(self.vehicles)
-            # Only seed 'pending'/'paid' here — 'appealed' status is now only set when a
-            # user actually files an appeal (see Violations page), so it always has a
-            # matching record in db.appeals for the Appeals page / Admin review to show.
             status = self._rand(['pending', 'pending', 'paid'])
             self.violations.append({
                 'id': f'vi{i}', 'violationNo': f'VLN-2026-{1000+i}',
@@ -230,14 +227,6 @@ class DriveDB:
         ]
 
 # ================= DATABASE INSTANCE =================
-# IMPORTANT: DriveDB() used to be instantiated here directly, which meant a brand
-# new (re-randomized) mock database was created on EVERY Streamlit rerun (i.e. on
-# every single click/interaction). That wiped out newly registered accounts, reset
-# admin changes, and made login state look inconsistent for every user, including
-# admin. st.cache_resource makes Streamlit build the DriveDB object exactly once
-# per running app process and hand back the SAME instance (kept in server memory)
-# on every rerun and for every connected user/session, so data actually persists
-# for as long as the app is running.
 @st.cache_resource
 def get_db():
     return DriveDB()
@@ -731,6 +720,7 @@ def load_css():
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      position: relative;
     }
     
     .icon-btn .dot {
@@ -1029,7 +1019,6 @@ def render_dashboard():
     violations = get_my_violations()
     pending = [v for v in violations if v['status'] == 'pending']
     paid = [v for v in violations if v['status'] == 'paid']
-    # Admins see the platform-wide unread count; everyone else sees their own.
     my_notifs = db.notifications if user['role'] == 'admin' else [n for n in db.notifications if n['userId'] == user['id']]
     notifs = [n for n in my_notifs if not n.get('read', False)]
     docs = get_my_documents()
@@ -1179,13 +1168,95 @@ def render_vehicles():
     """, unsafe_allow_html=True)
     
     vehicles = get_my_vehicles()
+    user = current_user()
+    
+    # ============ ADD VEHICLE FORM - FIXED ============
+    with st.expander("➕ Add New Vehicle"):
+        st.markdown('<p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">Fill in the details below to register a vehicle to your account. All fields with * are required.</p>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            reg_no = st.text_input("Registration Number *", placeholder="e.g. DHAKA METRO GA 11-2481")
+            vehicle_type = st.selectbox("Vehicle Type *", ["Private Car", "Motorcycle", "Bus", "Truck", "CNG", "Other"])
+            manufacturer = st.text_input("Manufacturer *", placeholder="e.g. Toyota, Yamaha, Tata")
+            model = st.text_input("Model *", placeholder="e.g. Corolla Axio, X-Blade")
+            
+        with col2:
+            color = st.selectbox("Color", ["White", "Black", "Silver", "Red", "Blue", "Gray", "Green", "Other"])
+            fuel_type = st.selectbox("Fuel Type", ["Petrol", "Octane", "Diesel", "CNG", "Electric"])
+            engine_no = st.text_input("Engine Number", placeholder="Optional")
+            chassis_no = st.text_input("Chassis Number", placeholder="Optional")
+        
+        # Expiry dates
+        st.markdown('<p style="font-weight: 600; margin-top: 10px; margin-bottom: 6px;">Document Expiry Dates</p>', unsafe_allow_html=True)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            reg_expiry = st.date_input("Registration Expiry", value=datetime.now() + timedelta(days=365))
+        with col2:
+            tax_expiry = st.date_input("Road Tax Expiry", value=datetime.now() + timedelta(days=180))
+        with col3:
+            fitness_expiry = st.date_input("Fitness Expiry", value=datetime.now() + timedelta(days=90))
+        with col4:
+            insurance_expiry = st.date_input("Insurance Expiry", value=datetime.now() + timedelta(days=365))
+        
+        if st.button("Register Vehicle", type="primary"):
+            # Validation
+            if not reg_no.strip():
+                st.error("Registration number is required.")
+            elif not manufacturer.strip():
+                st.error("Manufacturer is required.")
+            elif not model.strip():
+                st.error("Model is required.")
+            else:
+                # Check if vehicle already exists
+                existing = next((v for v in db.vehicles if v['regNo'].lower() == reg_no.strip().lower()), None)
+                if existing:
+                    st.error("A vehicle with this registration number already exists in the system.")
+                else:
+                    # Create new vehicle
+                    new_vehicle = {
+                        'id': db._nid('v'),
+                        'ownerId': user['id'],
+                        'regNo': reg_no.strip().upper(),
+                        'type': vehicle_type,
+                        'manufacturer': manufacturer.strip(),
+                        'model': model.strip(),
+                        'engine': engine_no.strip() or f"ENG{random.randint(100000, 999999)}",
+                        'chassis': chassis_no.strip() or f"CHS{random.randint(100000, 999999)}",
+                        'fuel': fuel_type,
+                        'regDate': datetime.now().strftime("%Y-%m-%d"),
+                        'regExpiry': reg_expiry.strftime("%Y-%m-%d"),
+                        'taxExpiry': tax_expiry.strftime("%Y-%m-%d"),
+                        'fitnessExpiry': fitness_expiry.strftime("%Y-%m-%d"),
+                        'insuranceExpiry': insurance_expiry.strftime("%Y-%m-%d"),
+                        'color': color,
+                        'image': None,
+                        'status': 'active',
+                        'mileage': random.randint(0, 5000),
+                        'safety': random.randint(70, 95)
+                    }
+                    db.vehicles.append(new_vehicle)
+                    
+                    # Add notification
+                    db.notifications.append({
+                        'id': db._nid('n'),
+                        'userId': user['id'],
+                        'category': 'system',
+                        'title': 'Vehicle registered',
+                        'message': f'Vehicle {reg_no.strip().upper()} has been added to your account.',
+                        'read': False,
+                        'date': db._fmt_date(datetime.now())
+                    })
+                    
+                    st.success(f"✅ Vehicle {reg_no.strip().upper()} registered successfully!")
+                    st.rerun()
     
     # Search/filter
     col1, col2 = st.columns([2, 1])
     with col1:
         search = st.text_input("Search by reg no or model...", key="veh_search", placeholder="Search...")
     with col2:
-        type_filter = st.selectbox("Filter by type", ["All types", "Private Car", "Motorcycle", "Bus", "Truck"], key="veh_filter")
+        type_filter = st.selectbox("Filter by type", ["All types", "Private Car", "Motorcycle", "Bus", "Truck", "CNG", "Other"], key="veh_filter")
     
     filtered = vehicles
     if search:
@@ -1194,7 +1265,7 @@ def render_vehicles():
         filtered = [v for v in filtered if v['type'] == type_filter]
     
     if not filtered:
-        st.markdown('<div class="empty">No vehicles found. Add your first vehicle to get started.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="empty">No vehicles found. Add your first vehicle using the form above.</div>', unsafe_allow_html=True)
     else:
         cols = st.columns(2)
         for i, v in enumerate(filtered):
@@ -1265,9 +1336,15 @@ def render_violations():
     # Pagination
     per_page = 6
     total_pages = (len(filtered) - 1) // per_page + 1
-    page = st.session_state.get('vio_page', 1)
+    
+    # Initialize page in session state if not exists
+    if 'vio_page' not in st.session_state:
+        st.session_state.vio_page = 1
+    
+    page = st.session_state.vio_page
     if page > total_pages:
         page = total_pages
+        st.session_state.vio_page = page
     start = (page - 1) * per_page
     end = start + per_page
     page_items = filtered[start:end]
@@ -1335,9 +1412,7 @@ def render_violations():
                     st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Pagination controls — a windowed pager that scales to any number of pages
-    # instead of assuming there are 5 or fewer (which used to overflow every
-    # page past #4 into the same column).
+    # Pagination controls
     if total_pages > 1:
         window = 5
         half = window // 2
@@ -1453,10 +1528,7 @@ def render_documents():
         st.markdown('<div class="empty">Add a vehicle first to start uploading documents.</div>', unsafe_allow_html=True)
         return
     
-    if not docs:
-        st.markdown('<div class="empty">No documents uploaded yet.</div>', unsafe_allow_html=True)
-    
-    # Upload form
+    # Upload form - FIXED
     with st.expander("📤 Upload new document"):
         col1, col2 = st.columns(2)
         with col1:
@@ -1468,18 +1540,34 @@ def render_documents():
             vehicle = st.selectbox("Vehicle", vehicles, format_func=lambda v: v['regNo'])
         
         uploaded_file = st.file_uploader("Choose file", type=['pdf', 'png', 'jpg', 'jpeg'])
-        if st.button("Upload") and uploaded_file:
-            # In a real app, we'd save the file
-            db.documents.append({
-                'id': db._nid('d'),
-                'vehicleId': vehicle['id'],
-                'type': doc_type,
-                'name': doc_type,
-                'dataUrl': None,
-                'uploadedDate': db._fmt_date(datetime.now())
-            })
-            st.success("Document uploaded successfully!")
-            st.rerun()
+        
+        if st.button("Upload Document", type="primary"):
+            if uploaded_file is None:
+                st.error("Please select a file to upload.")
+            else:
+                # In a real app, we'd save the file
+                db.documents.append({
+                    'id': db._nid('d'),
+                    'vehicleId': vehicle['id'],
+                    'type': doc_type,
+                    'name': uploaded_file.name,
+                    'dataUrl': None,
+                    'uploadedDate': db._fmt_date(datetime.now())
+                })
+                
+                # Add notification
+                db.notifications.append({
+                    'id': db._nid('n'),
+                    'userId': current_user()['id'],
+                    'category': 'system',
+                    'title': 'Document uploaded',
+                    'message': f'{doc_type} for {vehicle["regNo"]} has been uploaded successfully.',
+                    'read': False,
+                    'date': db._fmt_date(datetime.now())
+                })
+                
+                st.success(f"✅ {doc_type} uploaded successfully for {vehicle['regNo']}!")
+                st.rerun()
     
     # Display documents
     if docs:
@@ -1497,6 +1585,8 @@ def render_documents():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="empty">No documents uploaded yet. Use the form above to add your first document.</div>', unsafe_allow_html=True)
 
 def render_service():
     st.markdown("""
@@ -1760,20 +1850,21 @@ def render_profile():
     
     with col1:
         name = st.text_input("Full name", user['name'])
+        email = st.text_input("Email", user['email'], disabled=True)
         phone = st.text_input("Phone", user['phone'])
         license_no = st.text_input("Driving Licence No.", user['license'])
         nid = st.text_input("NID Number", user['nid'])
         emergency = st.text_input("Emergency Contact", user['emergency'])
         address = st.text_area("Address", user['address'])
         
-        if st.button("Save changes"):
+        if st.button("Save Changes", type="primary"):
             user['name'] = name
             user['phone'] = phone
             user['license'] = license_no
             user['nid'] = nid
             user['emergency'] = emergency
             user['address'] = address
-            st.success("Profile updated!")
+            st.success("✅ Profile updated successfully!")
             st.rerun()
     
     with col2:
@@ -1794,11 +1885,15 @@ def render_profile():
         st.markdown('<div class="panel"><div class="panel-head"><h3>Change Password</h3></div>', unsafe_allow_html=True)
         cur = st.text_input("Current password", type="password")
         new = st.text_input("New password", type="password")
-        if st.button("Update password") and cur and new:
+        confirm_new = st.text_input("Confirm new password", type="password")
+        if st.button("Update Password", type="primary") and cur and new:
             if cur == user['password']:
                 if len(new) >= 6:
-                    user['password'] = new
-                    st.success("Password updated successfully!")
+                    if new == confirm_new:
+                        user['password'] = new
+                        st.success("✅ Password updated successfully!")
+                    else:
+                        st.error("New passwords do not match.")
                 else:
                     st.error("New password must be at least 6 characters")
             else:
@@ -2119,9 +2214,6 @@ def main():
                 logout_user()
         
         # Main content
-        # Safety net: if the requested page doesn't exist, or a non-admin somehow
-        # ends up with 'admin' as their page (e.g. role changed mid-session), fall
-        # back to the dashboard instead of showing a blank screen or restricted page.
         valid_pages = {'dashboard', 'vehicles', 'violations', 'payments', 'documents',
                        'service', 'appeals', 'brta', 'aidemo', 'notifications', 'profile', 'admin'}
         if st.session_state.page not in valid_pages or (
