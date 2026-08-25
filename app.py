@@ -110,7 +110,9 @@ class DriveDB:
                 'color': self._rand(['White', 'Black', 'Silver', 'Red', 'Blue']),
                 'image': None, 'status': 'active',
                 'mileage': self._rand_int(5000, 80000),
-                'safety': self._rand_int(62, 98)
+                'safety': self._rand_int(62, 98),
+                'lastService': self._fmt_date(self._days_from_now(-self._rand_int(30, 180))),
+                'serviceInterval': self._rand_int(3000, 8000)
             })
         
         # Violations
@@ -172,6 +174,8 @@ class DriveDB:
              'Your appeal for VLN-2026-1002 is under review.'),
             ('payment', 'Receipt available',
              'Download your receipt for RCPT payment anytime from Payments.'),
+            ('reminder', 'Service due', 
+             'Your vehicle DHAKA METRO GA 11-2481 is due for servicing.'),
         ]
         owner_notifs = [
             ('reminder', 'Fitness certificate due',
@@ -201,17 +205,49 @@ class DriveDB:
                 n_id += 1
         
         # Service history
-        for i in range(6):
+        for i in range(12):
             veh = self._rand(self.vehicles)
+            service_types = ['Oil Change', 'Engine Service', 'Tyre Change',
+                           'Battery Replacement', 'Brake Service', 'Full Service',
+                           'Wheel Alignment', 'AC Service', 'Transmission Service']
+            service_type = self._rand(service_types)
+            service_date = self._days_from_now(-self._rand_int(10, 200))
+            current_mileage = veh.get('mileage', 5000) + self._rand_int(-2000, 2000)
+            
+            cost_map = {
+                'Oil Change': (800, 1500),
+                'Engine Service': (3000, 6000),
+                'Tyre Change': (4000, 8000),
+                'Battery Replacement': (2000, 3500),
+                'Brake Service': (1500, 3000),
+                'Full Service': (5000, 10000),
+                'Wheel Alignment': (1000, 2000),
+                'AC Service': (1500, 3000),
+                'Transmission Service': (4000, 8000)
+            }
+            min_cost, max_cost = cost_map.get(service_type, (500, 3000))
+            
             self.service.append({
                 'id': f's{i}', 'vehicleId': veh['id'],
                 'vehicleNo': veh['regNo'],
-                'type': self._rand(['Oil Change', 'Engine Service', 'Tyre Change',
-                                   'Battery Replacement', 'Brake Service']),
-                'date': self._fmt_date(self._days_from_now(-self._rand_int(10, 200))),
-                'mileage': self._rand_int(5000, 80000),
-                'cost': self._rand_int(800, 6000),
-                'notes': 'Routine maintenance completed at authorized service center.'
+                'type': service_type,
+                'date': self._fmt_date(service_date),
+                'mileage': max(0, current_mileage),
+                'cost': self._rand_int(min_cost, max_cost),
+                'notes': self._rand([
+                    'Routine maintenance completed at authorized service center.',
+                    'Parts replaced with genuine components.',
+                    'Service completed with inspection report.',
+                    'Recommended next service in 5000 km.',
+                    'All systems checked and operating normally.'
+                ]),
+                'serviceCenter': self._rand([
+                    'Toyota Service Center, Dhaka',
+                    'Yamaha Service Center, Dhaka',
+                    'Auto Care Workshop, Chattogram',
+                    'Mechanic Pro, Sylhet',
+                    'Car Service BD, Dhaka'
+                ])
             })
         
         # Activity
@@ -224,6 +260,8 @@ class DriveDB:
              'time': '6 days ago'},
             {'icon': '🔔', 'text': 'Reminder sent: road tax expiring in 12 days',
              'time': '1 week ago'},
+            {'icon': '🔧', 'text': 'Service record added for DHAKA METRO GA 11-2481',
+             'time': '2 weeks ago'},
         ]
 
 # ================= DATABASE INSTANCE =================
@@ -349,7 +387,7 @@ def exp_badge(date_str):
     except:
         return '<span class="badge badge-navy">N/A</span>'
 
-# ================= CSS =================
+# ================= COLORFUL CSS =================
 def load_css():
     st.markdown("""
     <style>
@@ -371,6 +409,14 @@ def load_css():
       --font-d: 'Sora', sans-serif;
       --font-b: 'Inter', sans-serif;
       --font-m: 'JetBrains Mono', monospace;
+      
+      /* Colorful gradients */
+      --gradient-blue: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-green: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      --gradient-orange: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --gradient-purple: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+      --gradient-teal: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-sunset: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
     }
     
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -378,18 +424,117 @@ def load_css():
     .main-header { font-size: 2.4rem; font-weight: 700; color: var(--navy); margin-bottom: 0; font-family: 'Sora', sans-serif; }
     .sub-header { color: #555; font-size: 1.05rem; margin-top: 0; }
     
+    /* ============ COLORFUL METRIC CARDS ============ */
     .metric-card {
-      background: rgba(4,106,56,.06);
       padding: 16px;
-      border-radius: 10px;
-      border: 1px solid rgba(4,106,56,.18);
+      border-radius: 14px;
+      border: none;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    .metric-card .metric-icon {
+      font-size: 28px;
+      opacity: 0.3;
+      position: absolute;
+      right: 16px;
+      top: 16px;
+    }
+    .metric-card .metric-value {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: 'Sora', sans-serif;
+      display: block;
+      margin-top: 6px;
+    }
+    .metric-card .metric-label {
+      font-size: 13px;
+      opacity: 0.85;
+      font-weight: 500;
+    }
+    .metric-card-green { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .metric-card-blue { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .metric-card-orange { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .metric-card-purple { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+    .metric-card-teal { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .metric-card-pink { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    
+    /* ============ WELCOME BANNER ============ */
+    .welcome-banner {
+      background: linear-gradient(135deg, #0B2545 0%, #1a3a6b 50%, #2d5a8e 100%);
+      border-radius: 16px;
+      padding: 30px 40px;
+      color: white;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .welcome-banner::before {
+      content: '🚗';
+      position: absolute;
+      right: 40px;
+      bottom: -20px;
+      font-size: 120px;
+      opacity: 0.1;
+    }
+    .welcome-banner h2 {
+      font-family: 'Sora', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .welcome-banner p {
+      opacity: 0.85;
+      font-size: 15px;
+      margin-top: 4px;
     }
     
+    /* ============ QUICK ACTION GRID ============ */
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .quick-item {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 10px;
+      text-align: center;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .quick-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      border-color: var(--green);
+    }
+    .quick-item .qi-icon {
+      font-size: 24px;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .quick-item.qi-green { border-left: 3px solid var(--green); }
+    .quick-item.qi-blue { border-left: 3px solid #667eea; }
+    .quick-item.qi-orange { border-left: 3px solid #f5576c; }
+    .quick-item.qi-purple { border-left: 3px solid #a18cd1; }
+    .quick-item.qi-teal { border-left: 3px solid #4facfe; }
+    .quick-item.qi-pink { border-left: 3px solid #fa709a; }
+    
+    /* ============ BADGES ============ */
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 4px 10px;
+      padding: 4px 12px;
       border-radius: 100px;
       font-size: 11.5px;
       font-weight: 600;
@@ -398,7 +543,10 @@ def load_css():
     .badge-red { background: rgba(200,16,46,.12); color: var(--red); }
     .badge-amber { background: rgba(180,116,14,.14); color: var(--amber); }
     .badge-navy { background: rgba(11,37,69,.1); color: var(--navy); }
+    .badge-blue { background: rgba(102,126,234,.12); color: #667eea; }
+    .badge-purple { background: rgba(161,140,209,.15); color: #764ba2; }
     
+    /* ============ STAT CARDS ============ */
     .stat-card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -408,6 +556,10 @@ def load_css():
       justify-content: space-between;
       align-items: flex-start;
       background: white;
+      transition: all 0.2s ease;
+    }
+    .stat-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
     }
     
     .mono { font-family: 'JetBrains Mono', monospace; }
@@ -418,6 +570,10 @@ def load_css():
       border-radius: 14px;
       padding: 20px;
       margin-bottom: 20px;
+      transition: all 0.2s ease;
+    }
+    .panel:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
     }
     
     .panel-head {
@@ -428,19 +584,6 @@ def load_css():
     }
     
     .panel-head h3 { font-size: 15.5px; margin: 0; }
-    
-    .grid-cards {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    
-    .two-col {
-      display: grid;
-      grid-template-columns: 1.6fr 1fr;
-      gap: 20px;
-    }
     
     .page-head {
       display: flex;
@@ -467,45 +610,6 @@ def load_css():
     .page-help b { color: var(--navy); }
     .page-help ul { margin: 6px 0 0 18px; padding: 0; }
     .page-help li { margin-bottom: 3px; }
-    
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    
-    .toolbar input, .toolbar select {
-      padding: 9px 12px;
-      border-radius: 9px;
-      border: 1px solid var(--border);
-      background: var(--paper);
-      color: var(--ink);
-      font-size: 13px;
-    }
-    
-    .btn {
-      border: none;
-      border-radius: 10px;
-      padding: 11px 20px;
-      font-weight: 600;
-      font-size: 14px;
-      transition: .2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-    }
-    .btn-primary { background: var(--green); color: #fff; }
-    .btn-primary:hover { background: var(--green-l); }
-    .btn-dark { background: var(--navy); color: #fff; }
-    .btn-dark:hover { background: var(--navy-2); }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--ink); }
-    .btn-outline:hover { border-color: var(--green); color: var(--green); }
-    .btn-red { background: var(--red); color: #fff; }
-    .btn-red:hover { opacity: .9; }
-    .btn-sm { padding: 7px 12px; font-size: 12.5px; border-radius: 8px; }
-    .btn-block { width: 100%; justify-content: center; }
     
     .empty {
       text-align: center;
@@ -564,36 +668,6 @@ def load_css():
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-    }
-    
-    .flag {
-      display: inline-block;
-      width: 22px;
-      height: 15px;
-      border-radius: 2px;
-      background: #046A38;
-      position: relative;
-      overflow: hidden;
-      vertical-align: middle;
-      margin-right: 4px;
-    }
-    .flag::after {
-      content: '';
-      position: absolute;
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: #C8102E;
-      top: 3px;
-      left: 5.5px;
-    }
-    
-    .brand {
-      font-size: 20px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
     
     .s-ic {
@@ -665,98 +739,6 @@ def load_css():
     .notif-item b { font-size: 13.5px; display: block; }
     .notif-item p { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
     .notif-item .time { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
-    
-    .tabs {
-      display: flex;
-      gap: 6px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 18px;
-    }
-    
-    .tab {
-      padding: 10px 16px;
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--muted);
-      border-bottom: 2px solid transparent;
-      cursor: pointer;
-    }
-    
-    .tab.active { color: var(--green); border-color: var(--green); }
-    
-    .pager {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 14px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-    
-    .pbtns { display: flex; gap: 6px; }
-    .pbtns button {
-      width: 30px;
-      height: 30px;
-      border-radius: 7px;
-      border: 1px solid var(--border);
-      background: white;
-      color: var(--ink);
-      cursor: pointer;
-    }
-    .pbtns button.active {
-      background: var(--green);
-      color: #fff;
-      border-color: var(--green);
-    }
-    
-    .icon-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 9px;
-      border: 1px solid var(--border);
-      background: white;
-      color: var(--ink);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      position: relative;
-    }
-    
-    .icon-btn .dot {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--red);
-      border: 2px solid white;
-    }
-    
-    .role-pick {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-    
-    .role-opt {
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      padding: 10px 6px;
-      text-align: center;
-      font-size: 12.5px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-    }
-    
-    .role-opt.active {
-      border-color: var(--green);
-      color: var(--green);
-      background: rgba(4,106,56,.08);
-    }
     
     .timeline {
       list-style: none;
@@ -841,26 +823,6 @@ def load_css():
       outline-offset: 1px;
     }
     
-    .demo-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 18px;
-      flex-wrap: wrap;
-    }
-    
-    .demo-chip {
-      border: 1px dashed var(--border);
-      background: white;
-      font-size: 12px;
-      padding: 7px 10px;
-      border-radius: 8px;
-      color: var(--muted);
-      cursor: pointer;
-      border: 1px solid #E2E6EA;
-    }
-    
-    .demo-chip:hover { border-color: var(--green); color: var(--green); }
-    
     .hero-stats {
       display: flex;
       gap: 34px;
@@ -878,11 +840,28 @@ def load_css():
       color: var(--muted);
     }
     
+    .service-card {
+      border-left: 3px solid var(--green);
+      padding-left: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .service-card .cost {
+      font-weight: 600;
+      color: var(--green);
+    }
+    
+    /* ============ RESPONSIVE ============ */
     @media (max-width: 1000px) {
       .grid-cards { grid-template-columns: repeat(2, 1fr); }
       .two-col { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
       .doc-grid { grid-template-columns: repeat(2, 1fr); }
+      .quick-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .quick-grid { grid-template-columns: repeat(2, 1fr); }
+      .metric-card .metric-value { font-size: 20px; }
     }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1014,6 +993,7 @@ def render_landing():
     """, unsafe_allow_html=True)
 
 def render_dashboard():
+    """Enhanced colorful dashboard inspired by Green University portal"""
     user = current_user()
     vehicles = get_my_vehicles()
     violations = get_my_violations()
@@ -1022,95 +1002,165 @@ def render_dashboard():
     my_notifs = db.notifications if user['role'] == 'admin' else [n for n in db.notifications if n['userId'] == user['id']]
     notifs = [n for n in my_notifs if not n.get('read', False)]
     docs = get_my_documents()
-
+    service_records = get_my_service()
+    
+    total_fine_value = sum(v['fine'] for v in pending)
+    total_paid_value = sum(v['fine'] for v in paid)
+    
+    # Count vehicles with expiring documents
+    expiring_soon = []
+    for v in vehicles:
+        try:
+            tax_days = (datetime.strptime(v['taxExpiry'], "%Y-%m-%d") - datetime.now()).days
+            fitness_days = (datetime.strptime(v['fitnessExpiry'], "%Y-%m-%d") - datetime.now()).days
+            insurance_days = (datetime.strptime(v['insuranceExpiry'], "%Y-%m-%d") - datetime.now()).days
+            if tax_days < 30 or fitness_days < 30 or insurance_days < 30:
+                expiring_soon.append(v)
+        except:
+            pass
+    
     first_name = user['name'].split()[0] if user.get('name') else 'there'
+
+    # ============ WELCOME BANNER ============
     st.markdown(f"""
-    <div class="page-head">
+    <div class="welcome-banner">
         <div>
-            <h2>Welcome back, {first_name} 👋</h2>
-            <p>Here's a snapshot of your vehicles, fines and paperwork, all in one place.</p>
+            <h2>👋 Hello, {first_name}!</h2>
+            <p>Your unified digital gateway for vehicle management, violations tracking, and document storage.</p>
+            <div style="display: flex; gap: 24px; margin-top: 14px; flex-wrap: wrap;">
+                <div><span style="opacity:0.7;">Vehicles</span> <b style="font-size:20px;">{len(vehicles)}</b></div>
+                <div><span style="opacity:0.7;">Pending Fines</span> <b style="font-size:20px; color:#ff6b6b;">{len(pending)}</b></div>
+                <div><span style="opacity:0.7;">Documents</span> <b style="font-size:20px;">{len(docs)}</b></div>
+                <div><span style="opacity:0.7;">Service Records</span> <b style="font-size:20px;">{len(service_records)}</b></div>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ============ QUICK ACTION GRID ============
     st.markdown("""
-    <div class="page-help">
-        This dashboard summarizes everything tied to your account. Use the cards below for a quick health check,
-        then jump into a section from the sidebar: <b>My Vehicles</b> to add or review a vehicle, <b>Violations</b>
-        to pay a fine or file an appeal, and <b>Documents</b> to keep your papers from expiring unnoticed.
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0 12px 0;">
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">🚀 Quick Actions & Services</h3>
+    </div>
+    <div class="quick-grid">
+        <div class="quick-item qi-green" onclick="window.location.href='#vehicles'">
+            <span class="qi-icon">🚗</span>
+            My Vehicles
+        </div>
+        <div class="quick-item qi-blue" onclick="window.location.href='#violations'">
+            <span class="qi-icon">⚠️</span>
+            Violations
+        </div>
+        <div class="quick-item qi-orange" onclick="window.location.href='#payments'">
+            <span class="qi-icon">💰</span>
+            Bill & Payment
+        </div>
+        <div class="quick-item qi-purple" onclick="window.location.href='#documents'">
+            <span class="qi-icon">📄</span>
+            Documents
+        </div>
+        <div class="quick-item qi-teal" onclick="window.location.href='#service'">
+            <span class="qi-icon">🔧</span>
+            Service
+        </div>
+        <div class="quick-item qi-pink" onclick="window.location.href='#appeals'">
+            <span class="qi-icon">📝</span>
+            Appeals
+        </div>
+        <div class="quick-item qi-green" onclick="window.location.href='#brta'">
+            <span class="qi-icon">🔎</span>
+            BRTA Lookup
+        </div>
+        <div class="quick-item qi-blue" onclick="window.location.href='#notifications'">
+            <span class="qi-icon">🔔</span>
+            Notifications
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    
+
+    # ============ COLORFUL METRIC CARDS ============
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Vehicles</span><b>{len(vehicles)}</b></div>
-            <div class="s-ic" style="background: #0B254522; color: #0B2545;">🚗</div>
+        <div class="metric-card metric-card-green">
+            <span class="metric-icon">🚗</span>
+            <span class="metric-label">Total Vehicles</span>
+            <span class="metric-value">{len(vehicles)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Pending Fines</span><b>{len(pending)}</b></div>
-            <div class="s-ic" style="background: #C8102E22; color: #C8102E;">⚠</div>
+        <div class="metric-card metric-card-orange">
+            <span class="metric-icon">⚠️</span>
+            <span class="metric-label">Pending Fines</span>
+            <span class="metric-value">{len(pending)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Paid Fines</span><b>{len(paid)}</b></div>
-            <div class="s-ic" style="background: #046A3822; color: #046A38;">✓</div>
+        <div class="metric-card metric-card-blue">
+            <span class="metric-icon">✅</span>
+            <span class="metric-label">Paid Fines</span>
+            <span class="metric-value">{len(paid)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col4:
-        soon = [v for v in vehicles if any([
-            datetime.strptime(v['regExpiry'], "%Y-%m-%d") < datetime.now() + timedelta(days=30),
-            datetime.strptime(v['taxExpiry'], "%Y-%m-%d") < datetime.now() + timedelta(days=30),
-            datetime.strptime(v['fitnessExpiry'], "%Y-%m-%d") < datetime.now() + timedelta(days=30),
-            datetime.strptime(v['insuranceExpiry'], "%Y-%m-%d") < datetime.now() + timedelta(days=30)
-        ])]
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Upcoming Renewals</span><b>{len(soon)}</b></div>
-            <div class="s-ic" style="background: #B4740E22; color: #B4740E;">⏰</div>
+        <div class="metric-card metric-card-purple">
+            <span class="metric-icon">📄</span>
+            <span class="metric-label">Documents</span>
+            <span class="metric-value">{len(docs)}</span>
         </div>
         """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
+
+    # ============ SECOND ROW OF METRICS ============
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Notifications</span><b>{len(notifs)}</b></div>
-            <div class="s-ic" style="background: #0B254522; color: #0B2545;">🔔</div>
+        <div class="metric-card metric-card-teal">
+            <span class="metric-icon">🔔</span>
+            <span class="metric-label">Notifications</span>
+            <span class="metric-value">{len(notifs)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Documents Stored</span><b>{len(docs)}</b></div>
-            <div class="s-ic" style="background: #046A3822; color: #046A38;">📁</div>
+        <div class="metric-card metric-card-pink">
+            <span class="metric-icon">⏰</span>
+            <span class="metric-label">Expiring Soon</span>
+            <span class="metric-value">{len(expiring_soon)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col3:
-        total_fine = sum(v['fine'] for v in pending)
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Fine Value</span><b>৳{total_fine:,}</b></div>
-            <div class="s-ic" style="background: #C8102E22; color: #C8102E;">৳</div>
+        <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <span class="metric-icon">🔧</span>
+            <span class="metric-label">Service Records</span>
+            <span class="metric-value">{len(service_records)}</span>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Recent activity
+    with col4:
+        total_value = total_paid_value + total_fine_value
+        st.markdown(f"""
+        <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <span class="metric-icon">💰</span>
+            <span class="metric-label">Total Fine Value</span>
+            <span class="metric-value">৳{total_value:,}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ============ TWO COLUMN LAYOUT ============
     st.markdown('<div class="two-col">', unsafe_allow_html=True)
     
     col1, col2 = st.columns([1.6, 1])
     with col1:
-        st.markdown('<div class="panel"><div class="panel-head"><h3>Recent Activity</h3></div>', unsafe_allow_html=True)
-        for act in db.activity:
+        # ============ RECENT ACTIVITY ============
+        st.markdown('<div class="panel"><div class="panel-head"><h3>📋 Recent Activity</h3></div>', unsafe_allow_html=True)
+        for act in db.activity[:6]:
             st.markdown(f"""
             <div style="display:flex; gap:12px; padding:10px 0; border-bottom:1px solid #E2E6EA;">
                 <span style="font-size:18px;">{act['icon']}</span>
-                <div>
+                <div style="flex:1;">
                     <div style="font-size:13.5px;">{act['text']}</div>
                     <div style="font-size:11.5px; color:#5B6B82;">{act['time']}</div>
                 </div>
@@ -1119,35 +1169,61 @@ def render_dashboard():
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
-        st.markdown('<div class="panel"><div class="panel-head"><h3>Upcoming Expiries</h3></div>', unsafe_allow_html=True)
-        if soon:
-            for v in soon[:5]:
+        # ============ UPCOMING EXPIRIES ============
+        st.markdown('<div class="panel"><div class="panel-head"><h3>⏰ Upcoming Expiries</h3></div>', unsafe_allow_html=True)
+        if expiring_soon:
+            for v in expiring_soon[:5]:
+                expiring_items = []
+                try:
+                    if (datetime.strptime(v['taxExpiry'], "%Y-%m-%d") - datetime.now()).days < 30:
+                        expiring_items.append("Tax")
+                    if (datetime.strptime(v['fitnessExpiry'], "%Y-%m-%d") - datetime.now()).days < 30:
+                        expiring_items.append("Fitness")
+                    if (datetime.strptime(v['insuranceExpiry'], "%Y-%m-%d") - datetime.now()).days < 30:
+                        expiring_items.append("Insurance")
+                except:
+                    pass
                 st.markdown(f"""
                 <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #E2E6EA; font-size:13px;">
-                    <span class="mono">{v['regNo']}</span>
-                    <span class="badge badge-amber">Tax: {v['taxExpiry']}</span>
+                    <span class="mono" style="font-weight:600;">{v['regNo']}</span>
+                    <span class="badge badge-amber">{', '.join(expiring_items)}</span>
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.markdown('<div class="empty">No upcoming expiries 🎉</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="panel-head" style="margin-top:18px;"><h3>Quick Actions</h3></div>', unsafe_allow_html=True)
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            if st.button("+ Add vehicle", use_container_width=True):
-                st.session_state.page = 'vehicles'
-                st.rerun()
-        with col_b:
-            if st.button("View violations", use_container_width=True):
-                st.session_state.page = 'violations'
-                st.rerun()
-        with col_c:
-            if st.button("Upload document", use_container_width=True):
-                st.session_state.page = 'documents'
-                st.rerun()
+            st.markdown('<div class="empty" style="padding:20px;">🎉 No upcoming expiries</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # ============ VIOLATION SUMMARY ============
+    if violations:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-head"><h3>⚠️ Violation Summary</h3></div>', unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"""
+            <div style="text-align:center; padding:12px; background:#f8f9fa; border-radius:10px;">
+                <div style="font-size:24px; font-weight:700; color:#B4740E;">{len(pending)}</div>
+                <div style="font-size:12px; color:#5B6B82;">Pending</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div style="text-align:center; padding:12px; background:#f8f9fa; border-radius:10px;">
+                <div style="font-size:24px; font-weight:700; color:#046A38;">{len(paid)}</div>
+                <div style="font-size:12px; color:#5B6B82;">Paid</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            appealed = [v for v in violations if v['status'] == 'appealed']
+            st.markdown(f"""
+            <div style="text-align:center; padding:12px; background:#f8f9fa; border-radius:10px;">
+                <div style="font-size:24px; font-weight:700; color:#0B2545;">{len(appealed)}</div>
+                <div style="font-size:12px; color:#5B6B82;">Appealed</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_vehicles():
     st.markdown("""
@@ -1170,7 +1246,7 @@ def render_vehicles():
     vehicles = get_my_vehicles()
     user = current_user()
     
-    # ============ ADD VEHICLE FORM - FIXED ============
+    # Add Vehicle Form
     with st.expander("➕ Add New Vehicle"):
         st.markdown('<p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">Fill in the details below to register a vehicle to your account. All fields with * are required.</p>', unsafe_allow_html=True)
         
@@ -1200,7 +1276,6 @@ def render_vehicles():
             insurance_expiry = st.date_input("Insurance Expiry", value=datetime.now() + timedelta(days=365))
         
         if st.button("Register Vehicle", type="primary"):
-            # Validation
             if not reg_no.strip():
                 st.error("Registration number is required.")
             elif not manufacturer.strip():
@@ -1208,12 +1283,10 @@ def render_vehicles():
             elif not model.strip():
                 st.error("Model is required.")
             else:
-                # Check if vehicle already exists
                 existing = next((v for v in db.vehicles if v['regNo'].lower() == reg_no.strip().lower()), None)
                 if existing:
                     st.error("A vehicle with this registration number already exists in the system.")
                 else:
-                    # Create new vehicle
                     new_vehicle = {
                         'id': db._nid('v'),
                         'ownerId': user['id'],
@@ -1233,11 +1306,12 @@ def render_vehicles():
                         'image': None,
                         'status': 'active',
                         'mileage': random.randint(0, 5000),
-                        'safety': random.randint(70, 95)
+                        'safety': random.randint(70, 95),
+                        'lastService': datetime.now().strftime("%Y-%m-%d"),
+                        'serviceInterval': random.randint(3000, 8000)
                     }
                     db.vehicles.append(new_vehicle)
                     
-                    # Add notification
                     db.notifications.append({
                         'id': db._nid('n'),
                         'userId': user['id'],
@@ -1337,7 +1411,6 @@ def render_violations():
     per_page = 6
     total_pages = (len(filtered) - 1) // per_page + 1
     
-    # Initialize page in session state if not exists
     if 'vio_page' not in st.session_state:
         st.session_state.vio_page = 1
     
@@ -1360,8 +1433,7 @@ def render_violations():
             "Date": v['date'],
             "Location": v['location'],
             "Fine": f"৳{v['fine']:,}",
-            "Status": v['status'],
-            "Action": "View"
+            "Status": status_badge(v['status'])
         })
     
     df = pd.DataFrame(data)
@@ -1369,7 +1441,7 @@ def render_violations():
     
     st.markdown('</div></div>', unsafe_allow_html=True)
 
-    # ============ Pay a fine / File an appeal ============
+    # Pay a fine / File an appeal
     pending_now = [v for v in filtered if v['status'] == 'pending']
     if pending_now:
         st.markdown('<div class="panel"><div class="panel-head"><h3>Pay a fine or file an appeal</h3></div>', unsafe_allow_html=True)
@@ -1390,7 +1462,7 @@ def render_violations():
                     'date': db._fmt_date(datetime.now()), 'status': 'completed',
                     'receiptNo': f'RCPT-{random.randint(100000, 999999)}'
                 })
-                st.success(f"Payment of ৳{pick['fine']:,} confirmed via {method}!")
+                st.success(f"✅ Payment of ৳{pick['fine']:,} confirmed via {method}!")
                 st.rerun()
 
         with tab_appeal:
@@ -1408,7 +1480,7 @@ def render_violations():
                         'timeline': [{'label': 'Appeal submitted', 'date': db._fmt_date(datetime.now())}],
                         'adminResponse': None
                     })
-                    st.success("Appeal submitted! An admin will review it soon.")
+                    st.success("✅ Appeal submitted! An admin will review it soon.")
                     st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1468,23 +1540,26 @@ def render_payments():
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Paid</span><b>৳{total:,}</b></div>
-            <div class="s-ic" style="background: #046A3822; color: #046A38;">৳</div>
+        <div class="metric-card metric-card-green">
+            <span class="metric-icon">💰</span>
+            <span class="metric-label">Total Paid</span>
+            <span class="metric-value">৳{total:,}</span>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Transactions</span><b>{len(payments)}</b></div>
-            <div class="s-ic" style="background: #0B254522; color: #0B2545;">🧾</div>
+        <div class="metric-card metric-card-blue">
+            <span class="metric-icon">🧾</span>
+            <span class="metric-label">Transactions</span>
+            <span class="metric-value">{len(payments)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Most used method</span><b>{most_used}</b></div>
-            <div class="s-ic" style="background: #B4740E22; color: #B4740E;">📱</div>
+        <div class="metric-card metric-card-purple">
+            <span class="metric-icon">📱</span>
+            <span class="metric-label">Most Used Method</span>
+            <span class="metric-value">{most_used}</span>
         </div>
         """, unsafe_allow_html=True)
     
@@ -1528,7 +1603,7 @@ def render_documents():
         st.markdown('<div class="empty">Add a vehicle first to start uploading documents.</div>', unsafe_allow_html=True)
         return
     
-    # Upload form - FIXED
+    # Upload form
     with st.expander("📤 Upload new document"):
         col1, col2 = st.columns(2)
         with col1:
@@ -1545,7 +1620,6 @@ def render_documents():
             if uploaded_file is None:
                 st.error("Please select a file to upload.")
             else:
-                # In a real app, we'd save the file
                 db.documents.append({
                     'id': db._nid('d'),
                     'vehicleId': vehicle['id'],
@@ -1555,7 +1629,6 @@ def render_documents():
                     'uploadedDate': db._fmt_date(datetime.now())
                 })
                 
-                # Add notification
                 db.notifications.append({
                     'id': db._nid('n'),
                     'userId': current_user()['id'],
@@ -1589,11 +1662,12 @@ def render_documents():
         st.markdown('<div class="empty">No documents uploaded yet. Use the form above to add your first document.</div>', unsafe_allow_html=True)
 
 def render_service():
+    """Enhanced service history with add service functionality"""
     st.markdown("""
     <div class="page-head">
         <div>
-            <h2>Service History</h2>
-            <p>Track maintenance and set reminders by mileage.</p>
+            <h2>🔧 Service History</h2>
+            <p>Track maintenance, log new services, and set reminders by mileage.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1602,30 +1676,235 @@ def render_service():
         A running log of every oil change, tyre swap or workshop visit for your vehicles, along with cost and
         mileage at the time. Logging service visits consistently makes it easy to spot patterns — like a vehicle
         needing more frequent servicing than expected — and gives you a maintenance record if you ever resell it.
+        
+        <ul>
+            <li><b>Add a service</b> using the form below whenever you take a vehicle for maintenance.</li>
+            <li><b>Track costs</b> over time and see which vehicles are costing more to maintain.</li>
+            <li><b>Service due</b> indicators show when a vehicle needs attention based on time or mileage.</li>
+        </ul>
     </div>
     """, unsafe_allow_html=True)
     
+    vehicles = get_my_vehicles()
     service = get_my_service()
     
-    if not service:
-        st.markdown('<div class="empty">No service records yet.</div>', unsafe_allow_html=True)
+    if not vehicles:
+        st.markdown('<div class="empty">Add a vehicle first to start tracking service history.</div>', unsafe_allow_html=True)
         return
     
-    data = []
-    for s in service:
-        data.append({
-            "Vehicle": s['vehicleNo'],
-            "Service Type": s['type'],
-            "Date": s['date'],
-            "Mileage": f"{s['mileage']:,} km",
-            "Cost": f"৳{s['cost']:,}",
-            "Notes": s['notes'][:30] + "..." if len(s['notes']) > 30 else s['notes']
-        })
+    # Add Service Record
+    with st.expander("➕ Add Service Record"):
+        st.markdown('<p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">Log a new service visit for one of your vehicles.</p>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            selected_vehicle = st.selectbox(
+                "Vehicle *",
+                vehicles,
+                format_func=lambda v: f"{v['regNo']} - {v['manufacturer']} {v['model']}"
+            )
+            
+            service_type = st.selectbox(
+                "Service Type *",
+                [
+                    "Oil Change", 
+                    "Engine Service", 
+                    "Tyre Change",
+                    "Battery Replacement", 
+                    "Brake Service", 
+                    "Full Service",
+                    "Wheel Alignment",
+                    "AC Service",
+                    "Transmission Service",
+                    "Other"
+                ]
+            )
+            
+            service_date = st.date_input("Service Date", value=datetime.now())
+            
+        with col2:
+            current_mileage = st.number_input(
+                "Current Mileage (km) *",
+                min_value=0,
+                value=int(selected_vehicle.get('mileage', 0) + random.randint(100, 1000)),
+                step=100
+            )
+            
+            service_cost = st.number_input(
+                "Service Cost (BDT) *",
+                min_value=0,
+                value=random.randint(1000, 5000),
+                step=100
+            )
+            
+            service_center = st.text_input(
+                "Service Center",
+                placeholder="e.g. Toyota Service Center, Dhaka"
+            )
+        
+        notes = st.text_area(
+            "Notes",
+            placeholder="Describe the service performed, parts replaced, etc.",
+            height=80
+        )
+        
+        if st.button("💾 Save Service Record", type="primary"):
+            if not selected_vehicle:
+                st.error("Please select a vehicle.")
+            elif current_mileage < 0:
+                st.error("Mileage cannot be negative.")
+            elif service_cost < 0:
+                st.error("Cost cannot be negative.")
+            else:
+                service_record = {
+                    'id': db._nid('s'),
+                    'vehicleId': selected_vehicle['id'],
+                    'vehicleNo': selected_vehicle['regNo'],
+                    'type': service_type,
+                    'date': service_date.strftime("%Y-%m-%d"),
+                    'mileage': current_mileage,
+                    'cost': service_cost,
+                    'notes': notes.strip() or "Service completed.",
+                    'serviceCenter': service_center.strip() or "Local Service Center"
+                }
+                db.service.append(service_record)
+                
+                selected_vehicle['mileage'] = current_mileage
+                selected_vehicle['lastService'] = service_date.strftime("%Y-%m-%d")
+                
+                db.notifications.append({
+                    'id': db._nid('n'),
+                    'userId': current_user()['id'],
+                    'category': 'system',
+                    'title': 'Service Record Added',
+                    'message': f'{service_type} logged for {selected_vehicle["regNo"]} at {current_mileage:,} km. Cost: ৳{service_cost:,}',
+                    'read': False,
+                    'date': db._fmt_date(datetime.now())
+                })
+                
+                db.activity.insert(0, {
+                    'icon': '🔧',
+                    'text': f'{service_type} recorded for {selected_vehicle["regNo"]} at {current_mileage:,} km',
+                    'time': 'Just now'
+                })
+                
+                st.success(f"✅ Service record added successfully for {selected_vehicle['regNo']}!")
+                st.rerun()
     
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    df = pd.DataFrame(data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Service Statistics
+    if service:
+        total_services = len(service)
+        total_cost = sum(s['cost'] for s in service)
+        avg_cost = total_cost / total_services if total_services > 0 else 0
+        
+        service_types = {}
+        for s in service:
+            service_types[s['type']] = service_types.get(s['type'], 0) + 1
+        
+        most_common_service = max(service_types.items(), key=lambda x: x[1])[0] if service_types else "N/A"
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card metric-card-blue">
+                <span class="metric-icon">🔧</span>
+                <span class="metric-label">Total Services</span>
+                <span class="metric-value">{total_services}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card metric-card-green">
+                <span class="metric-icon">💰</span>
+                <span class="metric-label">Total Cost</span>
+                <span class="metric-value">৳{total_cost:,}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"""
+            <div class="metric-card metric-card-orange">
+                <span class="metric-icon">📊</span>
+                <span class="metric-label">Average Cost</span>
+                <span class="metric-value">৳{avg_cost:,.0f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with col4:
+            st.markdown(f"""
+            <div class="metric-card metric-card-purple">
+                <span class="metric-icon">📋</span>
+                <span class="metric-label">Most Common</span>
+                <span class="metric-value">{most_common_service}</span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Filter services
+    if service:
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            search = st.text_input("Search by vehicle or service type...", key="serv_search", placeholder="Search...")
+        with col2:
+            vehicle_filter = st.selectbox(
+                "Filter by vehicle",
+                ["All vehicles"] + [v['regNo'] for v in vehicles],
+                key="serv_vehicle"
+            )
+        
+        filtered = service
+        if search:
+            filtered = [s for s in filtered if 
+                       search.lower() in s['vehicleNo'].lower() or 
+                       search.lower() in s['type'].lower()]
+        if vehicle_filter != "All vehicles":
+            filtered = [s for s in filtered if s['vehicleNo'] == vehicle_filter]
+        
+        filtered = sorted(filtered, key=lambda x: x['date'], reverse=True)
+        
+        if not filtered:
+            st.markdown('<div class="empty">No service records match your filters.</div>', unsafe_allow_html=True)
+            return
+        
+        # Display service records
+        st.markdown('<div class="panel"><div style="overflow-x:auto;">', unsafe_allow_html=True)
+        
+        data = []
+        for s in filtered:
+            vehicle = next((v for v in vehicles if v['id'] == s['vehicleId']), None)
+            data.append({
+                "Vehicle": s['vehicleNo'],
+                "Service Type": s['type'],
+                "Date": s['date'],
+                "Mileage": f"{s['mileage']:,} km",
+                "Cost": f"৳{s['cost']:,}",
+                "Service Center": s.get('serviceCenter', 'N/A')
+            })
+        
+        df = pd.DataFrame(data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        
+        # Detailed view
+        st.markdown('<div class="panel"><div class="panel-head"><h3>Service Details</h3></div>', unsafe_allow_html=True)
+        
+        for i, s in enumerate(filtered[:10]):
+            with st.expander(f"{s['date']} - {s['vehicleNo']} - {s['type']} (৳{s['cost']:,})"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"""
+                    **Vehicle:** {s['vehicleNo']}  
+                    **Service Type:** {s['type']}  
+                    **Date:** {s['date']}  
+                    **Mileage:** {s['mileage']:,} km  
+                    **Cost:** ৳{s['cost']:,}
+                    """)
+                with col2:
+                    st.markdown(f"""
+                    **Service Center:** {s.get('serviceCenter', 'Not specified')}  
+                    **Notes:** {s.get('notes', 'No additional notes')}
+                    """)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="empty">No service records yet. Use the form above to log your first service.</div>', unsafe_allow_html=True)
 
 def render_appeals():
     st.markdown("""
@@ -1690,7 +1969,6 @@ def render_notifications():
         st.markdown('<div class="empty">No notifications.</div>', unsafe_allow_html=True)
         return
     
-    # Filter
     filter_type = st.selectbox("Filter", ["all", "unread", "violation", "payment", "reminder", "system"])
     
     filtered = user_notifs
@@ -1701,7 +1979,7 @@ def render_notifications():
     
     for n in filtered:
         color = {"violation": "#C8102E", "payment": "#046A38", "reminder": "#B4740E", "system": "#0B2545"}.get(n['category'], "#0B2545")
-        icon = {"violation": "⚠", "payment": "৳", "reminder": "⏰", "system": "ℹ"}.get(n['category'], "🔔")
+        icon = {"violation": "⚠", "payment": "💰", "reminder": "⏰", "system": "ℹ"}.get(n['category'], "🔔")
         st.markdown(f"""
         <div class="notif-item {'unread' if not n['read'] else ''}">
             <div class="notif-ic" style="background: {color}22; color: {color};">{icon}</div>
@@ -1926,30 +2204,34 @@ def render_admin():
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Users</span><b>{len(db.users)}</b></div>
-            <div class="s-ic" style="background: #0B254522; color: #0B2545;">👤</div>
+        <div class="metric-card metric-card-blue">
+            <span class="metric-icon">👤</span>
+            <span class="metric-label">Total Users</span>
+            <span class="metric-value">{len(db.users)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Vehicles</span><b>{len(db.vehicles)}</b></div>
-            <div class="s-ic" style="background: #046A3822; color: #046A38;">🚗</div>
+        <div class="metric-card metric-card-green">
+            <span class="metric-icon">🚗</span>
+            <span class="metric-label">Total Vehicles</span>
+            <span class="metric-value">{len(db.vehicles)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Violations</span><b>{len(db.violations)}</b></div>
-            <div class="s-ic" style="background: #C8102E22; color: #C8102E;">⚠</div>
+        <div class="metric-card metric-card-orange">
+            <span class="metric-icon">⚠️</span>
+            <span class="metric-label">Total Violations</span>
+            <span class="metric-value">{len(db.violations)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col4:
         st.markdown(f"""
-        <div class="stat-card">
-            <div><span>Total Revenue</span><b>৳{total_fines:,}</b></div>
-            <div class="s-ic" style="background: #B4740E22; color: #B4740E;">৳</div>
+        <div class="metric-card metric-card-purple">
+            <span class="metric-icon">💰</span>
+            <span class="metric-label">Total Revenue</span>
+            <span class="metric-value">৳{total_fines:,}</span>
         </div>
         """, unsafe_allow_html=True)
     
@@ -2023,7 +2305,7 @@ def render_admin():
                         vio = next((v for v in db.violations if v['id'] == pick['violationId']), None)
                         if vio:
                             vio['status'] = 'waived'
-                        st.success("Appeal approved and fine waived.")
+                        st.success("✅ Appeal approved and fine waived.")
                         st.rerun()
                 with col_b:
                     if st.button("❌ Reject", key=f"reject_{pick['id']}", use_container_width=True):
@@ -2047,7 +2329,6 @@ def main():
         st.session_state.page = 'landing'
     
     if not is_logged_in():
-        # Landing page
         render_landing()
         
         st.divider()
@@ -2074,7 +2355,6 @@ def main():
             Admin can manage users, review appeals, and adjust system settings. Driver and Owner accounts show the day-to-day citizen experience.
             """)
 
-        # Login/Register tabs
         tab1, tab2 = st.tabs(["Log In", "Create Account"])
         
         with tab1:
@@ -2131,7 +2411,6 @@ def main():
                         else:
                             st.error(msg)
     else:
-        # App layout
         user = current_user()
         
         # Header
