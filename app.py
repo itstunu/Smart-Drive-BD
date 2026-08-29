@@ -208,7 +208,7 @@ class DriveDB:
                 'Brake Service': (1500, 3000),
                 'Full Service': (5000, 10000),
                 'Wheel Alignment': (1000, 2000),
-                'AC Service': (1500, 3000),
+                'AC Service': (1400, 3000),
                 'Transmission Service': (4000, 8000)
             }
             min_cost, max_cost = cost_map.get(service_type, (500, 3000))
