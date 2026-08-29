@@ -119,7 +119,7 @@ class DriveDB:
         vtypes = ["Red Light Crossing", "Speeding", "Wrong Lane", "Illegal Parking",
                   "Helmet Violation", "Seat Belt Violation", "Wrong Direction", "Signal Violation"]
         locs = ["Gulshan Circle 1, Dhaka", "Mirpur 10, Dhaka", "Motijheel C/A, Dhaka",
-                "Uttara Sector 7, Dhaka", "GEC Circle, Chattogram", "Zindabazar, Sylhet",
+                "Uttara Sector 8, Dhaka", "GEC Circle, Chattogram", "Zindabazar, Sylhet",
                 "Shahbagh, Dhaka", "Farmgate, Dhaka"]
         officers = ["Insp. M. Karim", "Sgt. F. Rahman", "Insp. S. Hossain", "Sgt. A. Islam"]
         
